@@ -33,7 +33,8 @@ async def search_transactions(
     limit:      int = 20,
 ) -> str:
     """Search and filter financial transactions. Returns a markdown table."""
-    conditions, params = [], []
+    conditions: list[str] = []
+    params: list[str | float | int] = []
 
     if query:
         conditions.append("description LIKE ?"); params.append(f"%{query}%")
