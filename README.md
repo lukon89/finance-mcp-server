@@ -1,5 +1,7 @@
 # Finance MCP Server
 
+> ⚠️ **Status: training/practice project.** Built to learn the Model Context Protocol — not production-ready and not intended to hold real financial data.
+
 An [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server that gives an LLM client (Claude Desktop, Claude Code, or any other MCP host) structured access to personal finance data: transaction search, spending summaries, monthly P&L reports, and live currency exchange rates.
 
 Data lives in a local SQLite database that is auto-created and seeded with 6 months of synthetic sample transactions on first run — there is nothing to configure to start exploring it.
