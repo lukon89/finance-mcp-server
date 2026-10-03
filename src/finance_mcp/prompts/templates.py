@@ -7,45 +7,45 @@ from mcp.types import (
 )
 
 _ANALYZE_SPENDING_TEMPLATE = """
-Proszę przeanalizuj moje wydatki za okres: **{period}**.{focus_text}
+Please analyze my spending for the period: **{period}**.{focus_text}
 
-Użyj narzędzi:
-1. `get_spending_summary` z odpowiednim period, group_by="category"
-2. `search_transactions` żeby znaleźć największe pojedyncze wydatki
+Use the following tools:
+1. `get_spending_summary` with the appropriate period, group_by="category"
+2. `search_transactions` to find the largest individual expenses
 
-Raport powinien zawierać:
-- Podział wydatków wg kategorii (tabela)
-- Top 5 największych transakcji
-- Konkretne 3 rekomendacje jak obniżyć koszty
-- Ocenę trendu (czy wydaję więcej czy mniej niż zazwyczaj)
+The report should include:
+- Spending breakdown by category (table)
+- Top 5 largest transactions
+- 3 concrete recommendations on how to reduce costs
+- Trend assessment (am I spending more or less than usual)
 """.strip()
 
 _BUDGET_REVIEW_TEMPLATE = """
-Zrób pełny przegląd budżetu na bieżący miesiąc. Mój budżet: **{budget} PLN/miesiąc**.
+Do a full budget review for the current month. My budget: **{budget}/month**.
 
-Kroki:
-1. Użyj `get_spending_summary` z period="this_month", group_by="category"
-2. Użyj `search_transactions` z date_from=pierwszy dzień miesiąca
+Steps:
+1. Use `get_spending_summary` with period="this_month", group_by="category"
+2. Use `search_transactions` with date_from=first day of the month
 
-Pokaż mi:
-- Budżet vs rzeczywiste wydatki per kategoria
-- Prognoza na koniec miesiąca (jeśli tempo się utrzyma)
-- Które kategorie przekraczają normę, a które mają zapas
-- Czy uda mi się zaoszczędzić w tym miesiącu
+Show me:
+- Budget vs actual spending per category
+- Month-end forecast (if the current pace continues)
+- Which categories are over budget and which have headroom
+- Whether I'm on track to save anything this month
 """.strip()
 
 _CURRENCY_EXPOSURE_TEMPLATE = """
-Przeanalizuj moją ekspozycję walutową na wszystkich kontach.
+Analyze my currency exposure across all accounts.
 
-Kroki:
-1. `search_transactions` z account="usd-account" — ile USD mam w przychodach/wydatkach
-2. `get_exchange_rate` żeby przeliczyć USD na PLN
-3. Porównaj z kontami w PLN
+Steps:
+1. `search_transactions` with account="usd-account" — income and expenses in USD
+2. `get_exchange_rate` to convert USD to the base currency
+3. Compare with base currency accounts
 
-Powiedz mi:
-- Jaki % moich przychodów jest w walutach obcych
-- Jak zmiana kursu USD/PLN o ±10% wpłynęłaby na moją sytuację
-- Czy warto hedgować ryzyko walutowe
+Tell me:
+- What percentage of my income is in foreign currencies
+- How a ±10% exchange rate change would affect my financial position
+- Whether hedging currency risk makes sense
 """.strip()
 
 PROMPTS = [
@@ -77,9 +77,9 @@ async def resolve_prompt(name: str, arguments: dict) -> GetPromptResult:
         case "analyze_spending":
             period = arguments.get("period", "last month")
             focus  = arguments.get("focus", "")
-            focus_text = f" Szczególnie przeanalizuj kategorię **{focus}**." if focus else ""
+            focus_text = f" Focus particularly on the **{focus}** category." if focus else ""
             return GetPromptResult(
-                description=f"Analiza wydatków — {period}",
+                description=f"Spending analysis — {period}",
                 messages=[PromptMessage(role="user", content=TextContent(
                     type="text",
                     text=_ANALYZE_SPENDING_TEMPLATE.format(period=period, focus_text=focus_text),
@@ -89,7 +89,7 @@ async def resolve_prompt(name: str, arguments: dict) -> GetPromptResult:
         case "budget_review":
             budget = arguments.get("budget_pln", "10000")
             return GetPromptResult(
-                description="Przegląd budżetu miesięcznego",
+                description="Monthly budget review",
                 messages=[PromptMessage(role="user", content=TextContent(
                     type="text",
                     text=_BUDGET_REVIEW_TEMPLATE.format(budget=budget),
@@ -98,7 +98,7 @@ async def resolve_prompt(name: str, arguments: dict) -> GetPromptResult:
 
         case "currency_exposure":
             return GetPromptResult(
-                description="Analiza ekspozycji walutowej",
+                description="Currency exposure analysis",
                 messages=[PromptMessage(role="user", content=TextContent(
                     type="text",
                     text=_CURRENCY_EXPOSURE_TEMPLATE,

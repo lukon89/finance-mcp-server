@@ -53,10 +53,11 @@ async def test_search_transactions_no_match():
 @pytest.mark.asyncio
 async def test_search_transactions_by_category():
     result = await handle_search_transactions({"category": "Food", "limit": 5})
-    # Seed data includes Food — should find rows
+    # Seed data (random.seed=42) guarantees Food rows in the last 6 months
     assert len(result) == 1
     text = result[0].text
-    assert "Food" in text or "No transactions" in text  # passes even if seed was thin
+    assert "Food" in text
+    assert "No transactions" not in text
 
 
 @pytest.mark.asyncio
