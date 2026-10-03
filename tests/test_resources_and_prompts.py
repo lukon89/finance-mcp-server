@@ -3,7 +3,6 @@ import pytest
 from finance_mcp.prompts.templates import resolve_prompt
 from finance_mcp.resources.reports import get_monthly_report, get_recent_transactions
 
-
 # ── Resource tests ────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
