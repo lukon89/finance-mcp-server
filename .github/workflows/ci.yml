@@ -19,11 +19,11 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
 
-      - name: Set up Python
-        run: uv python install 3.12
-
       - name: Install dependencies
-        run: uv pip install --system -e ".[dev]"
+        run: |
+          uv venv --python 3.12
+          uv pip install -e ".[dev]"
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Ruff (lint)
         run: ruff check src tests
@@ -43,11 +43,11 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "pyproject.toml"
 
-      - name: Set up Python
-        run: uv python install 3.12
-
       - name: Install dependencies
-        run: uv pip install --system -e ".[dev]"
+        run: |
+          uv venv --python 3.12
+          uv pip install -e ".[dev]"
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Pytest
         run: pytest -q
