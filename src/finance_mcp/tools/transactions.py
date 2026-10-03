@@ -76,7 +76,7 @@ async def handle_search_transactions(args: dict) -> list[TextContent]:
             f"SELECT * FROM transactions {where} ORDER BY date DESC LIMIT ?",
             params + [limit],
         ) as cur:
-            rows = await cur.fetchall()
+            rows = list(await cur.fetchall())
 
     if not rows:
         return [TextContent(type="text", text="No transactions found.")]
@@ -105,15 +105,14 @@ async def handle_spending_summary(args: dict) -> list[TextContent]:
     group_col   = _GROUP_COL[group_by]
     income_sql  = "" if include_income else "AND amount < 0"
 
-    async with aiosqlite.connect(settings.db_path) as db:
-        async with db.execute(
-            f"""SELECT {group_col} AS label, SUM(amount) AS total, COUNT(*) AS cnt
+    async with aiosqlite.connect(settings.db_path) as db, db.execute(
+        f"""SELECT {group_col} AS label, SUM(amount) AS total, COUNT(*) AS cnt
                 FROM transactions
                 WHERE {period_sql} {income_sql}
                 GROUP BY {group_col}
                 ORDER BY total ASC""",
-        ) as cur:
-            rows = await cur.fetchall()
+    ) as cur:
+        rows = await cur.fetchall()
 
     if not rows:
         return [TextContent(type="text", text=f"No data for period: {period}")]

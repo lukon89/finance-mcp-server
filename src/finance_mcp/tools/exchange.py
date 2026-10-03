@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import structlog
@@ -48,7 +48,7 @@ CONVERT_TOOL = Tool(
 async def _fetch_rates(base: str, targets: list[str], date: str | None) -> dict:
     """Fetch rates from frankfurter.app with TTL cache."""
     key = f"{base}:{','.join(sorted(targets))}:{date or 'latest'}"
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if key in _cache:
         data, fetched = _cache[key]

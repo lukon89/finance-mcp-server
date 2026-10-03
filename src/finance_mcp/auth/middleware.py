@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 from fastapi import HTTPException, Request
@@ -18,7 +18,7 @@ _WINDOW_SECONDS = 60.0
 
 
 def _check_rate_limit(user_id: str) -> None:
-    now  = datetime.now(timezone.utc).timestamp()
+    now  = datetime.now(UTC).timestamp()
     hits = [t for t in _windows.get(user_id, []) if now - t < _WINDOW_SECONDS]
     if len(hits) >= settings.rate_limit_per_minute:
         log.warning("rate_limit_exceeded", user_id=user_id, hits=len(hits))

@@ -1,13 +1,13 @@
-import hashlib
 import base64
+import hashlib
 import secrets
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlencode
 
 import httpx
 import structlog
-from jose import jwt, JWTError
+from jose import jwt
 
 from finance_mcp.config import settings
 
@@ -102,7 +102,7 @@ async def exchange_code(code: str, state: str) -> dict:
 
 def create_jwt(user_info: dict) -> str:
     """Issue a signed JWT for an authenticated user."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     payload = {
         "sub":   user_info["sub"],
         "email": user_info["email"],

@@ -1,13 +1,11 @@
-import time
 
 import httpx
 import pytest
 from jose import JWTError
 
-from finance_mcp.auth.oauth import create_jwt, verify_jwt
 from finance_mcp.auth.middleware import _check_rate_limit, _windows
+from finance_mcp.auth.oauth import create_jwt, verify_jwt
 from finance_mcp.config import settings
-
 
 # ── JWT tests ─────────────────────────────────────────────────────────────────
 

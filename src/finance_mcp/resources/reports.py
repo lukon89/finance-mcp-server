@@ -1,19 +1,19 @@
+from datetime import UTC, datetime
+
 import aiosqlite
-from datetime import datetime, timezone
 
 from finance_mcp.config import settings
 
 
 async def get_recent_transactions(limit: int = 50) -> str:
     """Last 30 days of transactions as a markdown table."""
-    async with aiosqlite.connect(settings.db_path) as db:
-        async with db.execute(
-            "SELECT date, description, amount, currency, category "
-            "FROM transactions WHERE date >= date('now', '-30 days') "
-            "ORDER BY date DESC LIMIT ?",
-            (limit,),
-        ) as cur:
-            rows = await cur.fetchall()
+    async with aiosqlite.connect(settings.db_path) as db, db.execute(
+        "SELECT date, description, amount, currency, category "
+        "FROM transactions WHERE date >= date('now', '-30 days') "
+        "ORDER BY date DESC LIMIT ?",
+        (limit,),
+    ) as cur:
+        rows = list(await cur.fetchall())
 
     if not rows:
         return "No transactions in the last 30 days."
@@ -30,7 +30,7 @@ async def get_monthly_report(month_spec: str) -> str:
     month_spec: 'latest' or 'YYYY-MM'
     """
     if month_spec == "latest":
-        month_spec = datetime.now(timezone.utc).strftime("%Y-%m")
+        month_spec = datetime.now(UTC).strftime("%Y-%m")
 
     async with aiosqlite.connect(settings.db_path) as db:
         async with db.execute(

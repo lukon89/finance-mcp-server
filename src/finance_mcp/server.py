@@ -4,14 +4,19 @@ import structlog
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import (
-    GetPromptResult, Prompt, Resource, TextContent, TextResourceContents, Tool,
+    AnyUrl,
+    GetPromptResult,
+    Prompt,
+    Resource,
+    TextContent,
+    TextResourceContents,
+    Tool,
 )
 
 from finance_mcp.db.setup import init_db
 from finance_mcp.prompts.templates import PROMPTS, resolve_prompt
 from finance_mcp.resources.reports import get_monthly_report, get_recent_transactions
-from finance_mcp.tools import ToolHandler
-from finance_mcp.tools import exchange, transactions
+from finance_mcp.tools import ToolHandler, exchange, transactions
 
 log = structlog.get_logger()
 
@@ -47,7 +52,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     try:
         return await handler(arguments)
     except Exception:
-        log.error("tool_call_failed", tool=name, exc_info=True)
+        log.exception("tool_call_failed", tool=name)
         raise
 
 # ── Resources ─────────────────────────────────────────────────────────────────
@@ -55,8 +60,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 @mcp.list_resources()
 async def list_resources() -> list[Resource]:
     return [
-        Resource(uri="finance://transactions/recent",      name="Recent Transactions (30d)",  mimeType="text/markdown"),
-        Resource(uri="finance://reports/monthly/latest",   name="Current Month Report",       mimeType="text/markdown"),
+        Resource(uri=AnyUrl("finance://transactions/recent"), name="Recent Transactions (30d)", mimeType="text/markdown"),
+        Resource(uri=AnyUrl("finance://reports/monthly/latest"), name="Current Month Report", mimeType="text/markdown"),
     ]
 
 
@@ -70,7 +75,7 @@ async def read_resource(uri: str) -> list[TextResourceContents]:
     else:
         log.warning("unknown_resource_requested", uri=uri)
         raise ValueError(f"Unknown resource URI: {uri}")
-    return [TextResourceContents(uri=uri, mimeType="text/markdown", text=text)]
+    return [TextResourceContents(uri=AnyUrl(uri), mimeType="text/markdown", text=text)]
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 

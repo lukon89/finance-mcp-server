@@ -1,6 +1,7 @@
 import random
 
 import pytest
+
 from finance_mcp import config as cfg_module
 
 

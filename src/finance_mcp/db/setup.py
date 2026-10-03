@@ -1,7 +1,9 @@
 import random
+from datetime import UTC, datetime, timedelta
+
 import aiosqlite
 import structlog
-from datetime import datetime, timedelta, timezone
+
 from finance_mcp.config import settings
 
 log = structlog.get_logger()
@@ -37,7 +39,9 @@ async def init_db() -> None:
         await db.commit()
 
         async with db.execute("SELECT COUNT(*) FROM transactions") as cur:
-            (count,) = await cur.fetchone()
+            row = await cur.fetchone()
+            assert row is not None, "COUNT(*) always returns exactly one row"
+            (count,) = row
 
         if count == 0:
             log.info("db_empty_seeding", db_path=settings.db_path)
@@ -47,7 +51,7 @@ async def init_db() -> None:
 
 
 async def _seed(db: aiosqlite.Connection) -> None:
-    today = datetime.now(timezone.utc)
+    today = datetime.now(UTC)
     rows = []
 
     # Daily expenses for last 6 months

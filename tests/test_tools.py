@@ -3,7 +3,10 @@ import pytest
 import respx
 
 from finance_mcp.tools.exchange import handle_convert_amount, handle_get_exchange_rate
-from finance_mcp.tools.transactions import handle_search_transactions, handle_spending_summary
+from finance_mcp.tools.transactions import (
+    handle_search_transactions,
+    handle_spending_summary,
+)
 
 FRANKFURTER_BASE = "https://api.frankfurter.app"
 
