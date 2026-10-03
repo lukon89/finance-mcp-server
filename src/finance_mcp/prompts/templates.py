@@ -1,11 +1,3 @@
-from mcp.types import (
-    GetPromptResult,
-    Prompt,
-    PromptArgument,
-    PromptMessage,
-    TextContent,
-)
-
 _ANALYZE_SPENDING_TEMPLATE = """
 Please analyze my spending for the period: **{period}**.{focus_text}
 
@@ -48,62 +40,18 @@ Tell me:
 - Whether hedging currency risk makes sense
 """.strip()
 
-PROMPTS = [
-    Prompt(
-        name="analyze_spending",
-        description="Analyze spending patterns for a given time period",
-        arguments=[
-            PromptArgument(name="period",   description="Period e.g. 'last month', 'Q3 2026'", required=True),
-            PromptArgument(name="focus",    description="Category to focus on (optional)",      required=False),
-        ],
-    ),
-    Prompt(
-        name="budget_review",
-        description="Monthly budget review with actionable recommendations",
-        arguments=[
-            PromptArgument(name="budget_pln", description="Monthly budget in PLN", required=False),
-        ],
-    ),
-    Prompt(
-        name="currency_exposure",
-        description="Analyze currency exposure across accounts",
-        arguments=[],
-    ),
-]
+
+async def analyze_spending(period: str, focus: str = "") -> str:
+    """Analyze spending patterns for a given time period."""
+    focus_text = f" Focus particularly on the **{focus}** category." if focus else ""
+    return _ANALYZE_SPENDING_TEMPLATE.format(period=period, focus_text=focus_text)
 
 
-async def resolve_prompt(name: str, arguments: dict) -> GetPromptResult:
-    match name:
-        case "analyze_spending":
-            period = arguments.get("period", "last month")
-            focus  = arguments.get("focus", "")
-            focus_text = f" Focus particularly on the **{focus}** category." if focus else ""
-            return GetPromptResult(
-                description=f"Spending analysis — {period}",
-                messages=[PromptMessage(role="user", content=TextContent(
-                    type="text",
-                    text=_ANALYZE_SPENDING_TEMPLATE.format(period=period, focus_text=focus_text),
-                ))],
-            )
+async def budget_review(budget_pln: str = "10000") -> str:
+    """Monthly budget review with actionable recommendations."""
+    return _BUDGET_REVIEW_TEMPLATE.format(budget=budget_pln)
 
-        case "budget_review":
-            budget = arguments.get("budget_pln", "10000")
-            return GetPromptResult(
-                description="Monthly budget review",
-                messages=[PromptMessage(role="user", content=TextContent(
-                    type="text",
-                    text=_BUDGET_REVIEW_TEMPLATE.format(budget=budget),
-                ))],
-            )
 
-        case "currency_exposure":
-            return GetPromptResult(
-                description="Currency exposure analysis",
-                messages=[PromptMessage(role="user", content=TextContent(
-                    type="text",
-                    text=_CURRENCY_EXPOSURE_TEMPLATE,
-                ))],
-            )
-
-        case _:
-            raise ValueError(f"Unknown prompt: {name}")
+async def currency_exposure() -> str:
+    """Analyze currency exposure across accounts."""
+    return _CURRENCY_EXPOSURE_TEMPLATE

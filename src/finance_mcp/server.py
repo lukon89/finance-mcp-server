@@ -1,100 +1,52 @@
 import asyncio
 
 import structlog
-from mcp.server import Server
-from mcp.server.stdio import stdio_server
-from mcp.types import (
-    AnyUrl,
-    GetPromptResult,
-    Prompt,
-    Resource,
-    TextContent,
-    TextResourceContents,
-    Tool,
-)
+from mcp.server.mcpserver import MCPServer
 
 from finance_mcp.db.setup import init_db
-from finance_mcp.prompts.templates import PROMPTS, resolve_prompt
+from finance_mcp.prompts.templates import (
+    analyze_spending,
+    budget_review,
+    currency_exposure,
+)
 from finance_mcp.resources.reports import get_monthly_report, get_recent_transactions
-from finance_mcp.tools import ToolHandler, exchange, transactions
+from finance_mcp.tools.exchange import convert_amount, get_exchange_rate
+from finance_mcp.tools.transactions import search_transactions, spending_summary
 
 log = structlog.get_logger()
 
-mcp = Server("finance-mcp")
+mcp = MCPServer("finance-mcp")
 
 # ── Tools ─────────────────────────────────────────────────────────────────────
-# Each tool module exports TOOLS: list[ToolRegistration]; adding a new domain
-# module only requires listing it here, not touching list_tools/call_tool.
 
-_TOOL_MODULES = [exchange, transactions]
-
-_TOOLS: list[Tool] = []
-_HANDLERS: dict[str, ToolHandler] = {}
-for _module in _TOOL_MODULES:
-    for _tool, _handler in _module.TOOLS:
-        _TOOLS.append(_tool)
-        _HANDLERS[_tool.name] = _handler
-
-
-@mcp.list_tools()
-async def list_tools() -> list[Tool]:
-    return _TOOLS
-
-
-@mcp.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    handler = _HANDLERS.get(name)
-    if handler is None:
-        log.warning("unknown_tool_requested", tool=name)
-        raise ValueError(f"Unknown tool: {name}")
-
-    log.info("tool_called", tool=name, arguments=arguments)
-    try:
-        return await handler(arguments)
-    except Exception:
-        log.exception("tool_call_failed", tool=name)
-        raise
+mcp.tool()(search_transactions)
+mcp.tool()(spending_summary)
+mcp.tool()(get_exchange_rate)
+mcp.tool()(convert_amount)
 
 # ── Resources ─────────────────────────────────────────────────────────────────
 
-@mcp.list_resources()
-async def list_resources() -> list[Resource]:
-    return [
-        Resource(uri=AnyUrl("finance://transactions/recent"), name="Recent Transactions (30d)", mimeType="text/markdown"),
-        Resource(uri=AnyUrl("finance://reports/monthly/latest"), name="Current Month Report", mimeType="text/markdown"),
-    ]
+@mcp.resource("finance://transactions/recent", name="Recent Transactions (30d)", mime_type="text/markdown")
+async def recent_transactions_resource() -> str:
+    return await get_recent_transactions()
 
 
-@mcp.read_resource()
-async def read_resource(uri: str) -> list[TextResourceContents]:
-    if uri == "finance://transactions/recent":
-        text = await get_recent_transactions()
-    elif uri.startswith("finance://reports/monthly/"):
-        spec = uri.removeprefix("finance://reports/monthly/")
-        text = await get_monthly_report(spec)
-    else:
-        log.warning("unknown_resource_requested", uri=uri)
-        raise ValueError(f"Unknown resource URI: {uri}")
-    return [TextResourceContents(uri=AnyUrl(uri), mimeType="text/markdown", text=text)]
+@mcp.resource("finance://reports/monthly/{month_spec}", name="Monthly Report", mime_type="text/markdown")
+async def monthly_report_resource(month_spec: str) -> str:
+    return await get_monthly_report(month_spec)
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 
-@mcp.list_prompts()
-async def list_prompts() -> list[Prompt]:
-    return PROMPTS
-
-
-@mcp.get_prompt()
-async def get_prompt(name: str, arguments: dict | None) -> GetPromptResult:
-    return await resolve_prompt(name, arguments or {})
+mcp.prompt()(analyze_spending)
+mcp.prompt()(budget_review)
+mcp.prompt()(currency_exposure)
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 async def _run() -> None:
     await init_db()
-    log.info("stdio_server_started", tools=len(_TOOLS))
-    async with stdio_server() as (read_stream, write_stream):
-        await mcp.run(read_stream, write_stream, mcp.create_initialization_options())
+    log.info("stdio_server_started")
+    await mcp.run_stdio_async()
 
 
 def main() -> None:

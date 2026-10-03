@@ -1,6 +1,10 @@
 import pytest
 
-from finance_mcp.prompts.templates import resolve_prompt
+from finance_mcp.prompts.templates import (
+    analyze_spending,
+    budget_review,
+    currency_exposure,
+)
 from finance_mcp.resources.reports import get_monthly_report, get_recent_transactions
 
 # ── Resource tests ────────────────────────────────────────────────────────────
@@ -41,36 +45,25 @@ async def test_get_monthly_report_no_data():
 
 @pytest.mark.asyncio
 async def test_analyze_spending_prompt_contains_period():
-    result = await resolve_prompt("analyze_spending", {"period": "last month"})
-    text = result.messages[0].content.text
-    assert "last month" in text
-    assert result.description == "Spending analysis — last month"
+    result = await analyze_spending(period="last month")
+    assert "last month" in result
 
 
 @pytest.mark.asyncio
 async def test_analyze_spending_prompt_with_focus():
-    result = await resolve_prompt("analyze_spending", {"period": "Q3 2026", "focus": "Food"})
-    text = result.messages[0].content.text
-    assert "Q3 2026" in text
-    assert "Food" in text
+    result = await analyze_spending(period="Q3 2026", focus="Food")
+    assert "Q3 2026" in result
+    assert "Food" in result
 
 
 @pytest.mark.asyncio
 async def test_budget_review_prompt_contains_budget():
-    result = await resolve_prompt("budget_review", {"budget_pln": "5000"})
-    text = result.messages[0].content.text
-    assert "5000" in text
-    assert result.description == "Monthly budget review"
+    result = await budget_review(budget_pln="5000")
+    assert "5000" in result
 
 
 @pytest.mark.asyncio
 async def test_currency_exposure_prompt_renders():
-    result = await resolve_prompt("currency_exposure", {})
-    assert result.description == "Currency exposure analysis"
-    assert len(result.messages) == 1
-
-
-@pytest.mark.asyncio
-async def test_unknown_prompt_raises():
-    with pytest.raises(ValueError, match="Unknown prompt"):
-        await resolve_prompt("nonexistent", {})
+    result = await currency_exposure()
+    assert "currency" in result.lower()
+    assert len(result) > 50

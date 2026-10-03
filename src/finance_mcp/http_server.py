@@ -87,7 +87,7 @@ async def sse_endpoint(request: Request, user: dict = Depends(require_auth)):
     """SSE endpoint — Claude connects here and streams JSON-RPC messages."""
     log.info("sse_connected", email=user.get("email"))
     async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
-        await mcp.run(streams[0], streams[1], mcp.create_initialization_options())
+        await mcp._lowlevel_server.run(streams[0], streams[1], mcp._lowlevel_server.create_initialization_options())
 
 
 @http_app.post("/messages")
