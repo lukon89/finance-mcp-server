@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Finance MCP Server with OAuth 2.0, SQLite, and SSE transport"
 requires-python = ">=3.12"
 dependencies = [
-    "mcp>=1.0.0",
+    "mcp>=1.0.0,<2.0.0",
     "httpx>=0.27.0",
     "aiosqlite>=0.20.0",
     "pydantic>=2.0.0",
@@ -17,6 +17,7 @@ dependencies = [
     "uvicorn[standard]>=0.30.0",
     "python-jose[cryptography]>=3.3.0",
     "structlog>=24.0.0",
+    "jinja2>=3.1.0",
 ]
 
 [project.optional-dependencies]
