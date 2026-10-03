@@ -1,7 +1,10 @@
 import random
 import aiosqlite
-from datetime import datetime, timedelta
+import structlog
+from datetime import datetime, timedelta, timezone
 from finance_mcp.config import settings
+
+log = structlog.get_logger()
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS transactions (
@@ -37,11 +40,14 @@ async def init_db() -> None:
             (count,) = await cur.fetchone()
 
         if count == 0:
+            log.info("db_empty_seeding", db_path=settings.db_path)
             await _seed(db)
+        else:
+            log.info("db_ready", db_path=settings.db_path, transactions=count)
 
 
 async def _seed(db: aiosqlite.Connection) -> None:
-    today = datetime.today()
+    today = datetime.now(timezone.utc)
     rows = []
 
     # Daily expenses for last 6 months
@@ -65,3 +71,4 @@ async def _seed(db: aiosqlite.Connection) -> None:
         rows,
     )
     await db.commit()
+    log.info("db_seeded", rows=len(rows))

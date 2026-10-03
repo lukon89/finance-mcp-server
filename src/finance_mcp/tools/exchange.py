@@ -1,12 +1,17 @@
 from datetime import datetime, timezone
 
 import httpx
+import structlog
 from mcp.types import TextContent, Tool
 
 from finance_mcp.config import settings
+from finance_mcp.tools import ToolRegistration
+
+log = structlog.get_logger()
 
 # ── In-memory cache: key → (data, fetched_at) ────────────────────────────────
 _cache: dict[str, tuple[dict, datetime]] = {}
+_MAX_CACHE_SIZE = 256
 
 # ── Tool schemas ──────────────────────────────────────────────────────────────
 
@@ -51,10 +56,19 @@ async def _fetch_rates(base: str, targets: list[str], date: str | None) -> dict:
             return data
 
     url = f"{settings.frankfurter_base_url}/{date or 'latest'}"
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(url, params={"from": base, "to": ",".join(targets)})
-        resp.raise_for_status()
-        data = resp.json()
+    log.info("exchange_rate_fetch", base=base, targets=targets, date=date)
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(url, params={"from": base, "to": ",".join(targets)})
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPError as exc:
+        log.error("exchange_rate_fetch_failed", base=base, targets=targets, error=str(exc))
+        raise
+
+    if len(_cache) >= _MAX_CACHE_SIZE:
+        oldest = min(_cache, key=lambda k: _cache[k][1])
+        del _cache[oldest]
 
     _cache[key] = (data, now)
     return data
@@ -88,3 +102,11 @@ async def handle_convert_amount(args: dict) -> list[TextContent]:
         f"Rate: {rate:.6f} ({data['date']})"
     )
     return [TextContent(type="text", text=text)]
+
+
+# ── Registration ──────────────────────────────────────────────────────────────
+
+TOOLS: list[ToolRegistration] = [
+    (EXCHANGE_RATE_TOOL, handle_get_exchange_rate),
+    (CONVERT_TOOL, handle_convert_amount),
+]

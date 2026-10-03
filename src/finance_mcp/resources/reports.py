@@ -1,5 +1,5 @@
 import aiosqlite
-from datetime import datetime
+from datetime import datetime, timezone
 
 from finance_mcp.config import settings
 
@@ -30,7 +30,7 @@ async def get_monthly_report(month_spec: str) -> str:
     month_spec: 'latest' or 'YYYY-MM'
     """
     if month_spec == "latest":
-        month_spec = datetime.today().strftime("%Y-%m")
+        month_spec = datetime.now(timezone.utc).strftime("%Y-%m")
 
     async with aiosqlite.connect(settings.db_path) as db:
         async with db.execute(

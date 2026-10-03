@@ -2,6 +2,7 @@ import aiosqlite
 from mcp.types import TextContent, Tool
 
 from finance_mcp.config import settings
+from finance_mcp.tools import ToolRegistration
 
 SEARCH_TOOL = Tool(
     name="search_transactions",
@@ -95,6 +96,11 @@ async def handle_spending_summary(args: dict) -> list[TextContent]:
     group_by       = args.get("group_by", "category")
     include_income = args.get("include_income", False)
 
+    if period not in _PERIOD_SQL:
+        raise ValueError(f"Invalid period: {period!r}. Valid: {list(_PERIOD_SQL)}")
+    if group_by not in _GROUP_COL:
+        raise ValueError(f"Invalid group_by: {group_by!r}. Valid: {list(_GROUP_COL)}")
+
     period_sql  = _PERIOD_SQL[period]
     group_col   = _GROUP_COL[group_by]
     income_sql  = "" if include_income else "AND amount < 0"
@@ -117,3 +123,11 @@ async def handle_spending_summary(args: dict) -> list[TextContent]:
     lines  = [f"| {r[0]} | {r[1]:+.2f} | {r[2]} |" for r in rows]
     text   = f"**Spending — {period}** (by {group_by})\nGrand total: **{grand:+.2f}**\n\n{header}\n" + "\n".join(lines)
     return [TextContent(type="text", text=text)]
+
+
+# ── Registration ──────────────────────────────────────────────────────────────
+
+TOOLS: list[ToolRegistration] = [
+    (SEARCH_TOOL, handle_search_transactions),
+    (SUMMARY_TOOL, handle_spending_summary),
+]

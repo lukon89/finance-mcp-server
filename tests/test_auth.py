@@ -1,5 +1,6 @@
 import time
 
+import httpx
 import pytest
 from jose import JWTError
 
@@ -50,3 +51,46 @@ def test_rate_limit_blocks_over_limit(monkeypatch):
     with pytest.raises(HTTPException) as exc_info:
         _check_rate_limit(user_id)
     assert exc_info.value.status_code == 429
+
+
+# ── HTTP route tests ──────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_health_is_public():
+    from finance_mcp.http_server import http_app
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=http_app), base_url="http://test"
+    ) as client:
+        resp = await client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_sse_requires_bearer_token():
+    from finance_mcp.http_server import http_app
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=http_app), base_url="http://test"
+    ) as client:
+        resp = await client.get("/sse")
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_sse_rejects_invalid_token():
+    from finance_mcp.http_server import http_app
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=http_app), base_url="http://test"
+    ) as client:
+        resp = await client.get("/sse", headers={"Authorization": "Bearer garbage.token.here"})
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_messages_requires_auth():
+    from finance_mcp.http_server import http_app
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=http_app), base_url="http://test"
+    ) as client:
+        resp = await client.post("/messages", content=b"{}")
+    assert resp.status_code == 401

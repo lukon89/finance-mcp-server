@@ -1,9 +1,12 @@
 import json
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mcp.server.sse import SseServerTransport
 
 from finance_mcp.auth.middleware import require_auth
@@ -14,8 +17,25 @@ from finance_mcp.server import mcp  # reuse the same Server instance
 
 log = structlog.get_logger()
 
-http_app = FastAPI(title="Finance MCP Server", version="0.1.0", docs_url="/docs")
-sse      = SseServerTransport("/messages")
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+_jinja = Environment(
+    loader=FileSystemLoader(TEMPLATES_DIR),
+    autoescape=select_autoescape(["html"]),
+)
+
+sse = SseServerTransport("/messages")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if settings.jwt_secret == "dev-secret-change-in-production":
+        log.warning("jwt_default_secret_in_use", hint="Set JWT_SECRET env var before deploying to production")
+    await init_db()
+    log.info("http_server_started", host=settings.host, port=settings.port)
+    yield
+
+
+http_app = FastAPI(title="Finance MCP Server", version="0.1.0", docs_url="/docs", lifespan=lifespan)
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
@@ -45,20 +65,12 @@ async def callback(code: str, state: str):
         }
     }, indent=2)
 
-    return HTMLResponse(f"""<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Finance MCP — Authenticated</title>
-<style>
-  body {{ font-family: monospace; background: #0f1117; color: #e2e8f0; padding: 2rem; }}
-  h2 {{ color: #64ffda; }} p {{ color: #8892b0; }}
-  pre {{ background: #1a1d27; border: 1px solid #2e3250; border-radius: 8px;
-         padding: 1.2rem; overflow: auto; font-size: 0.85rem; color: #f1fa8c; }}
-  a {{ color: #64ffda; }}
-</style></head><body>
-<h2>✅ Authenticated as {user_info['email']}</h2>
-<p>Add to <code>~/.claude/claude_desktop_config.json</code> (token expires in {settings.jwt_expire_minutes} min):</p>
-<pre>{config_snippet}</pre>
-<p><a href="/auth/login">Renew token</a> · <a href="/docs">API docs</a> · <a href="/health">Health</a></p>
-</body></html>""")
+    html = _jinja.get_template("callback.html").render(
+        email=user_info["email"],
+        expire_minutes=settings.jwt_expire_minutes,
+        config_snippet=config_snippet,
+    )
+    return HTMLResponse(html)
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -82,14 +94,6 @@ async def sse_endpoint(request: Request, user: dict = Depends(require_auth)):
 async def messages_endpoint(request: Request, user: dict = Depends(require_auth)):
     """Client posts MCP messages here (paired with /sse GET)."""
     await sse.handle_post_message(request.scope, request.receive, request._send)
-
-
-# ── Startup ───────────────────────────────────────────────────────────────────
-
-@http_app.on_event("startup")
-async def on_startup():
-    await init_db()
-    log.info("http_server_started", host=settings.host, port=settings.port)
 
 
 def main() -> None:

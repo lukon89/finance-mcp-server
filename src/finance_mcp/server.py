@@ -1,5 +1,6 @@
 import asyncio
 
+import structlog
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import (
@@ -9,32 +10,45 @@ from mcp.types import (
 from finance_mcp.db.setup import init_db
 from finance_mcp.prompts.templates import PROMPTS, resolve_prompt
 from finance_mcp.resources.reports import get_monthly_report, get_recent_transactions
-from finance_mcp.tools.exchange import (
-    CONVERT_TOOL, EXCHANGE_RATE_TOOL,
-    handle_convert_amount, handle_get_exchange_rate,
-)
-from finance_mcp.tools.transactions import (
-    SEARCH_TOOL, SUMMARY_TOOL,
-    handle_search_transactions, handle_spending_summary,
-)
+from finance_mcp.tools import ToolHandler
+from finance_mcp.tools import exchange, transactions
+
+log = structlog.get_logger()
 
 mcp = Server("finance-mcp")
 
 # ── Tools ─────────────────────────────────────────────────────────────────────
+# Each tool module exports TOOLS: list[ToolRegistration]; adding a new domain
+# module only requires listing it here, not touching list_tools/call_tool.
+
+_TOOL_MODULES = [exchange, transactions]
+
+_TOOLS: list[Tool] = []
+_HANDLERS: dict[str, ToolHandler] = {}
+for _module in _TOOL_MODULES:
+    for _tool, _handler in _module.TOOLS:
+        _TOOLS.append(_tool)
+        _HANDLERS[_tool.name] = _handler
+
 
 @mcp.list_tools()
 async def list_tools() -> list[Tool]:
-    return [EXCHANGE_RATE_TOOL, CONVERT_TOOL, SEARCH_TOOL, SUMMARY_TOOL]
+    return _TOOLS
 
 
 @mcp.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
-    match name:
-        case "get_exchange_rate":    return await handle_get_exchange_rate(arguments)
-        case "convert_amount":       return await handle_convert_amount(arguments)
-        case "search_transactions":  return await handle_search_transactions(arguments)
-        case "get_spending_summary": return await handle_spending_summary(arguments)
-        case _: raise ValueError(f"Unknown tool: {name}")
+    handler = _HANDLERS.get(name)
+    if handler is None:
+        log.warning("unknown_tool_requested", tool=name)
+        raise ValueError(f"Unknown tool: {name}")
+
+    log.info("tool_called", tool=name, arguments=arguments)
+    try:
+        return await handler(arguments)
+    except Exception:
+        log.error("tool_call_failed", tool=name, exc_info=True)
+        raise
 
 # ── Resources ─────────────────────────────────────────────────────────────────
 
@@ -54,6 +68,7 @@ async def read_resource(uri: str) -> list[TextResourceContents]:
         spec = uri.removeprefix("finance://reports/monthly/")
         text = await get_monthly_report(spec)
     else:
+        log.warning("unknown_resource_requested", uri=uri)
         raise ValueError(f"Unknown resource URI: {uri}")
     return [TextResourceContents(uri=uri, mimeType="text/markdown", text=text)]
 
@@ -72,6 +87,7 @@ async def get_prompt(name: str, arguments: dict | None) -> GetPromptResult:
 
 async def _run() -> None:
     await init_db()
+    log.info("stdio_server_started", tools=len(_TOOLS))
     async with stdio_server() as (read_stream, write_stream):
         await mcp.run(read_stream, write_stream, mcp.create_initialization_options())
 
