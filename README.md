@@ -6,7 +6,7 @@ An [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server that g
 
 Data lives in a local SQLite database that is auto-created and seeded with 6 months of synthetic sample transactions on first run — there is nothing to configure to start exploring it.
 
-The server ships with **two interchangeable transports** built on the same underlying MCP `Server` instance:
+The server ships with **two interchangeable transports** built on the same underlying `MCPServer` instance:
 
 | Entry point | Transport | Auth | Intended use |
 |---|---|---|---|
@@ -24,14 +24,14 @@ The server ships with **two interchangeable transports** built on the same under
 | `get_exchange_rate` | `tools/exchange.py` | Current or historical FX rates via [frankfurter.app](https://frankfurter.app), cached in-memory for 1 hour. |
 | `convert_amount` | `tools/exchange.py` | Convert an amount between two currencies using live rates. |
 
-Adding a new domain of tools only requires creating a module that exports a `TOOLS: list[ToolRegistration]` and listing it in `_TOOL_MODULES` in [server.py](src/finance_mcp/server.py) — `list_tools`/`call_tool` never need to change.
+Adding a new domain of tools only requires creating a module with typed async functions and calling `mcp.tool()(fn)` for each one in [server.py](src/finance_mcp/server.py). The input schema is inferred automatically from the function signature.
 
 ### Resources (read-only documents)
 
 | URI | Description |
 |---|---|
 | `finance://transactions/recent` | Last 30 days of transactions as markdown |
-| `finance://reports/monthly/latest` | Current month's income/expense/net P&L report |
+| `finance://reports/monthly/{month_spec}` | P&L report for a month — pass `latest` or `YYYY-MM` |
 
 ### Prompts (reusable analysis workflows)
 
@@ -54,7 +54,7 @@ flowchart TB
         HTTP["http_server.py\nFastAPI + SSE\n(finance-mcp-http)"]
     end
 
-    subgraph Core["Shared MCP Server core (server.py: mcp = Server(...))"]
+    subgraph Core["Shared MCP Server core (server.py: mcp = MCPServer(...))"]
         TOOLS["Tools\ntools/exchange.py\ntools/transactions.py"]
         RES["Resources\nresources/reports.py"]
         PROMPTS["Prompts\nprompts/templates.py"]
@@ -82,7 +82,7 @@ flowchart TB
     RES --> DB
 ```
 
-**Key design point:** `http_server.py` imports the *same* `mcp` `Server` instance from `server.py` (`from finance_mcp.server import mcp`) — tool/resource/prompt logic is defined exactly once and is transport-agnostic. The HTTP server just wraps it with FastAPI routes, OAuth, and an SSE pipe instead of stdio pipes.
+**Key design point:** `http_server.py` imports the *same* `mcp` `MCPServer` instance from `server.py` (`from finance_mcp.server import mcp`) — tool/resource/prompt logic is defined exactly once and is transport-agnostic. The HTTP server just wraps it with FastAPI routes, OAuth, and an SSE pipe instead of stdio pipes.
 
 ## Request flow — stdio (Claude Desktop / Claude Code)
 
@@ -158,7 +158,7 @@ Single table, created and seeded automatically by [`db/setup.py`](src/finance_mc
 
 ```
 src/finance_mcp/
-├── server.py              # stdio entry point; defines the shared `mcp` Server + tool/resource/prompt registry
+├── server.py              # stdio entry point; defines the shared `mcp` MCPServer + tool/resource/prompt registry
 ├── http_server.py          # FastAPI + SSE entry point; OAuth routes, reuses `mcp` from server.py
 ├── config.py                # pydantic-settings Settings, loaded from .env
 ├── db/
@@ -167,8 +167,8 @@ src/finance_mcp/
 │   ├── oauth.py              # Google OAuth 2.0 PKCE flow + JWT issuance/verification
 │   └── middleware.py         # require_auth FastAPI dependency (JWT check + rate limiting)
 ├── tools/
-│   ├── __init__.py           # ToolRegistration/ToolHandler type aliases
-│   ├── transactions.py       # search_transactions, get_spending_summary
+│   ├── __init__.py           # tools package marker
+│   ├── transactions.py       # search_transactions, spending_summary
 │   └── exchange.py           # get_exchange_rate, convert_amount (frankfurter.app, TTL cache)
 ├── resources/
 │   └── reports.py            # recent transactions + monthly report markdown builders
@@ -189,7 +189,7 @@ uv pip install -e . --python .venv/bin/python
 cp .env.example .env
 ```
 
-> **Note:** `mcp` is pinned to `<2.0.0` in `pyproject.toml`. The `mcp` 2.x release changed the `Server` API (removed the `@server.list_tools()`/`@server.call_tool()` decorators this codebase uses), so installing an unpinned `mcp` breaks the server at startup.
+> **Note:** This project uses `mcp>=2.0.0` and the `MCPServer` class (formerly `FastMCP`). The 2.x API registers tools, resources, and prompts with per-function decorators (`mcp.tool()`, `mcp.resource()`, `mcp.prompt()`) and infers input schemas directly from typed function signatures.
 
 ### Run via stdio (local, no auth)
 
